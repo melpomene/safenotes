@@ -36,5 +36,9 @@ if gpg --quiet --decrypt "$FILEPATH" 2>/dev/null | grep -q '[^[:space:]]'; then
     :
 else
     # File is empty or only whitespace, delete it
-    trash "$FILEPATH"
+    if command -v trash &> /dev/null; then
+        trash "$FILEPATH"
+    else
+        rm "$FILEPATH"
+    fi
 fi
