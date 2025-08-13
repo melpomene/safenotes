@@ -1,0 +1,85 @@
+#!/bin/bash
+
+# Source shared configuration
+SCRIPT_DIR="$(dirname "$0")"
+source "$SCRIPT_DIR/safenotes-config"
+
+# Parse arguments
+FILES_ONLY=false
+SEARCH_STRING=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -f|--files-only)
+            FILES_ONLY=true
+            shift
+            ;;
+        *)
+            SEARCH_STRING="$1"
+            shift
+            ;;
+    esac
+done
+
+# Check if search string is provided
+if [ -z "$SEARCH_STRING" ]; then
+    echo "Usage: $0 [-f|--files-only] <search_string>"
+    echo "  -f, --files-only  Only show filenames, don't open for editing"
+    echo "Searches for the given string in all encrypted notes (case-insensitive)"
+    exit 1
+fi
+
+# Validate configuration and check tools
+if ! validate_config; then
+    exit 1
+fi
+
+if ! check_common_tools; then
+    exit 1
+fi
+
+if [ "$FILES_ONLY" = false ]; then
+    if ! check_interactive_tools || ! check_editing_tools; then
+        exit 1
+    fi
+fi
+
+# Find and search through all .gpg files
+found_matches=false
+matching_files=()
+
+# Use find to get all .gpg files and process them
+while IFS= read -r -d '' file; do
+    # Decrypt the file in memory and search for the string (case-insensitive)
+    if gpg --quiet --decrypt "$file" 2>/dev/null | grep -qi "$SEARCH_STRING"; then
+        # Get just the filename without the full path
+        filename=$(basename "$file")
+        matching_files+=("$filename")
+        found_matches=true
+    fi
+done < <(find "$NOTES_DIR" -name "*.gpg" -type f -print0)
+
+# If no matches found, inform the user
+if [ "$found_matches" = false ]; then
+    echo "No matches found for: $SEARCH_STRING"
+    exit 1
+fi
+
+# Handle output based on mode
+if [ "$FILES_ONLY" = true ]; then
+    # Just print the filenames
+    printf '%s\n' "${matching_files[@]}"
+else
+    # Use fzf to select and open a file with GPG preview
+    SELECTED_FILE=$(printf '%s\n' "${matching_files[@]}" | fzf --prompt="Select file to edit: " --height=40% --border --preview="gpg --quiet --decrypt '$NOTES_DIR/{}' 2>/dev/null")
+    
+    # Check if user selected a file
+    if [ -z "$SELECTED_FILE" ]; then
+        echo "No file selected"
+        exit 0
+    fi
+    
+    # Open the selected file with neovim
+    FILEPATH="$NOTES_DIR/$SELECTED_FILE"
+    nvim "$FILEPATH"
+fi

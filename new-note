@@ -1,0 +1,40 @@
+#!/bin/bash
+
+# Source shared configuration
+SCRIPT_DIR="$(dirname "$0")"
+source "$SCRIPT_DIR/safenotes-config"
+
+# Validate configuration and check tools
+if ! validate_config; then
+    exit 1
+fi
+
+if ! check_common_tools; then
+    exit 1
+fi
+
+if ! check_editing_tools; then
+    exit 1
+fi
+
+# Get optional filename parameter
+OPTIONAL_NAME="$1"
+
+# Generate filename using shared function
+FILENAME=$(generate_filename "$OPTIONAL_NAME")
+FILEPATH="$NOTES_DIR/$FILENAME"
+
+# Pre-create encrypted file to avoid recipient prompt
+echo "" | gpg --armor --encrypt --trust-model always --recipient "$GPG_RECIPIENT" > "$FILEPATH"
+
+# Open the file with neovim (now it will decrypt automatically without prompting)
+nvim "$FILEPATH"
+
+# Check if file is effectively empty after editing (only contains whitespace when decrypted)
+if gpg --quiet --decrypt "$FILEPATH" 2>/dev/null | grep -q '[^[:space:]]'; then
+    # File has content, keep it
+    :
+else
+    # File is empty or only whitespace, delete it
+    trash "$FILEPATH"
+fi

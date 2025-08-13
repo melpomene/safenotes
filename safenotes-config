@@ -1,0 +1,86 @@
+#!/bin/bash
+
+# SafeNotes Configuration File
+# This file contains shared configuration settings for all safenotes scripts
+# Source this file in scripts using: source "$(dirname "$0")/safenotes-config"
+
+# Default notes directory - can be overridden by NOTES_DIR environment variable
+DEFAULT_NOTES_DIR="$HOME/Private/notes"
+NOTES_DIR="${NOTES_DIR:-$DEFAULT_NOTES_DIR}"
+
+# Default GPG recipient - can be overridden by GPG_RECIPIENT environment variable
+DEFAULT_GPG_RECIPIENT=""
+GPG_RECIPIENT="${GPG_RECIPIENT:-$DEFAULT_GPG_RECIPIENT}"
+
+# File extension configuration
+# Change to "md" if you prefer markdown files
+FILE_EXTENSION="txt"
+
+# Filename structure configuration
+# Format: {optional-name}-{timestamp}.{extension}.gpg
+# The timestamp format is: YYYY-MM-DD-HHMMSS
+TIMESTAMP_FORMAT='%Y-%m-%d-%H%M%S'
+
+# Function to generate filename
+generate_filename() {
+    local optional_name="$1"
+    local timestamp=$(date "+$TIMESTAMP_FORMAT")
+    
+    if [ -n "$optional_name" ]; then
+        echo "${optional_name}-${timestamp}.${FILE_EXTENSION}.gpg"
+    else
+        echo "${timestamp}.${FILE_EXTENSION}.gpg"
+    fi
+}
+
+# Function to validate configuration
+validate_config() {
+    # Check if GPG recipient is configured
+    if [ -z "$GPG_RECIPIENT" ]; then
+        echo "Error: GPG_RECIPIENT must be set to an email address"
+        echo "Either set the environment variable or edit the default in safenotes-config"
+        echo "Example: export GPG_RECIPIENT='your-email@example.com'"
+        return 1
+    fi
+    
+    # Create notes directory if it doesn't exist
+    if ! mkdir -p "$NOTES_DIR"; then
+        echo "Error: Cannot create notes directory '$NOTES_DIR'"
+        return 1
+    fi
+    
+    return 0
+}
+
+# Function to check required tools
+check_tool() {
+    local tool="$1"
+    local description="$2"
+    
+    if ! command -v "$tool" &> /dev/null; then
+        echo "Error: $tool is not installed or not in PATH"
+        if [ -n "$description" ]; then
+            echo "       $description"
+        fi
+        return 1
+    fi
+    return 0
+}
+
+# Common tool checks
+check_common_tools() {
+    check_tool "gpg" "GNU Privacy Guard is required for encryption/decryption" || return 1
+    return 0
+}
+
+# Check tools needed for editing
+check_editing_tools() {
+    check_tool "nvim" "Neovim is required for editing notes" || return 1
+    return 0
+}
+
+# Check tools needed for interactive search
+check_interactive_tools() {
+    check_tool "fzf" "fzf is required for interactive file selection" || return 1
+    return 0
+}
