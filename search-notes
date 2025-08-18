@@ -50,10 +50,24 @@ matching_files=()
 
 # Use find to get all .gpg files and process them
 while IFS= read -r -d '' file; do
-    # Decrypt the file in memory and search for the string (case-insensitive)
+    # Get just the filename without the full path and extension
+    filename=$(basename "$file")
+    filename_without_ext="${filename%.gpg}"
+    
+    # Check if search string matches filename (case-insensitive)
+    filename_match=false
+    if echo "$filename_without_ext" | grep -qi "$SEARCH_STRING"; then
+        filename_match=true
+    fi
+    
+    # Check if search string matches file content (case-insensitive)
+    content_match=false
     if gpg --quiet --decrypt "$file" 2>/dev/null | grep -qi "$SEARCH_STRING"; then
-        # Get just the filename without the full path
-        filename=$(basename "$file")
+        content_match=true
+    fi
+    
+    # Add file to results if either filename or content matches
+    if [ "$filename_match" = true ] || [ "$content_match" = true ]; then
         matching_files+=("$filename")
         found_matches=true
     fi
